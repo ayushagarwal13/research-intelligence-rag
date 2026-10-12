@@ -37,3 +37,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Frontend dependencies and generated build output
+node_modules/
+dist/
+
+# Frontend environment files
+.env.local
+.env.*.local
