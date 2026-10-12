@@ -1,15 +1,16 @@
-import os
-import time
-
-from dotenv import load_dotenv
-from google import genai
-from google.genai import errors
-
 from app.services.llm_service import (
     LLMService,
     LLMServiceUnavailableError,
 )
+from google.genai import errors
+from google import genai
+from dotenv import load_dotenv
+import time
+import os
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -21,9 +22,8 @@ class GeminiService(LLMService):
     Temporary server-side failures are retried with
     bounded exponential backoff.
 
-    Rate-limit and quota failures are surfaced as a
-    service-unavailable error after the SDK has exhausted
-    its own transient retry behavior.
+    Provider failures are logged without logging API keys
+    or prompt contents.
     """
 
     def __init__(
@@ -49,9 +49,7 @@ class GeminiService(LLMService):
                 "retry_delay cannot be negative."
             )
 
-        self.client = genai.Client(
-            api_key=api_key
-        )
+        self.client = genai.Client(api_key=api_key)
 
         self.model_name = (
             model_name
@@ -64,37 +62,19 @@ class GeminiService(LLMService):
         self.max_retries = max_retries
         self.retry_delay = retry_delay
 
-    def generate(
-        self,
-        prompt: str,
-    ) -> str:
-        """
-        Generate a response from Gemini.
-
-        Temporary 5xx server errors are retried using
-        bounded exponential backoff.
-
-        Gemini 429 quota/rate-limit failures are not retried
-        by this application because the Google GenAI SDK already
-        performs transient retry handling. Once those retries
-        are exhausted, the error is converted into a controlled
-        service-unavailable exception.
-        """
+    def generate(self, prompt: str) -> str:
+        """Generate a response from Gemini with bounded retries."""
 
         if not prompt.strip():
-            raise ValueError(
-                "Prompt cannot be empty."
-            )
+            raise ValueError("Prompt cannot be empty.")
 
         attempt = 0
 
         while True:
             try:
-                response = (
-                    self.client.models.generate_content(
-                        model=self.model_name,
-                        contents=prompt,
-                    )
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
                 )
 
                 if not response.text:
@@ -105,6 +85,12 @@ class GeminiService(LLMService):
                 return response.text.strip()
 
             except errors.ClientError as exc:
+                logger.error(
+                    "Gemini client error: model=%s status=%s",
+                    self.model_name,
+                    exc.code,
+                )
+
                 if exc.code == 429:
                     raise LLMServiceUnavailableError(
                         "The LLM service is temporarily unavailable "
@@ -115,16 +101,23 @@ class GeminiService(LLMService):
                 raise
 
             except errors.ServerError as exc:
+                logger.warning(
+                    "Gemini server error: model=%s status=%s "
+                    "attempt=%s max_retries=%s",
+                    self.model_name,
+                    exc.code,
+                    attempt + 1,
+                    self.max_retries + 1,
+                )
+
                 if attempt >= self.max_retries:
                     raise LLMServiceUnavailableError(
                         "The LLM service is temporarily unavailable. "
                         "Please try again later."
                     ) from exc
 
-                delay = (
-                    self.retry_delay
-                    * (2 ** attempt)
-                )
-
+                delay = self.retry_delay * (2 ** attempt)
                 time.sleep(delay)
                 attempt += 1
+
+
