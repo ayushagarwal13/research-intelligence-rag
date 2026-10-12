@@ -1,24 +1,32 @@
-from app.services.worker_runner import (
-    WorkerRunner,
-)
-from app.services.worker_dependencies import (
-    create_ingestion_worker,
-)
 from dotenv import load_dotenv
 from pathlib import Path
-
+import time
+import logging
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env")
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 POLL_INTERVAL_SECONDS = 5
 
 
-def create_worker_runner() -> WorkerRunner:
-    """Create a fully configured worker runner."""
+def create_worker_runner():
+    logger.info("Initializing ingestion worker dependencies...")
+
+    from app.services.worker_dependencies import (
+        create_ingestion_worker,
+    )
+    from app.services.worker_runner import WorkerRunner
+
     worker = create_ingestion_worker()
+    logger.info("Ingestion worker dependencies initialized.")
 
     return WorkerRunner(
         worker=worker,
@@ -27,9 +35,15 @@ def create_worker_runner() -> WorkerRunner:
 
 
 def main() -> None:
-    """Start the ingestion worker process."""
-    runner = create_worker_runner()
-    runner.run()
+    logger.info("Starting Research Intelligence ingestion worker.")
+
+    try:
+        runner = create_worker_runner()
+        logger.info("Worker initialized. Beginning job polling.")
+        runner.run()
+    except Exception:
+        logger.exception("Ingestion worker stopped because of an error.")
+        raise
 
 
 if __name__ == "__main__":
