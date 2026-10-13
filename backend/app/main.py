@@ -1,3 +1,4 @@
+
 from app.database.session import engine
 from app.database.models import (
     DocumentModel,
@@ -58,6 +59,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://research-intelligence-rag.netlify.app",
     ],
     allow_credentials=False,
     allow_methods=["*"],
