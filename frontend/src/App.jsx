@@ -189,7 +189,7 @@ function renderCitedText(text, sources, onSelect) {
 export default function App() {
   const [page, setPage] = useState("overview");
   const [apiUrl, setApiUrl] = useState(API_DEFAULT);
-  const [liveMode, setLiveMode] = useState(false);
+  const [liveMode, setLiveMode] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
 
   const [apiStatus, setApiStatus] = useState("unknown");
