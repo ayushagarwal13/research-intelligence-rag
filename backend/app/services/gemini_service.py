@@ -1,13 +1,14 @@
-import logging
-import os
-import time
-from dotenv import load_dotenv
-from google import genai
-from google.genai import errors
+
 from app.services.llm_service import (
     LLMService,
     LLMServiceUnavailableError,
 )
+from google.genai import errors
+from google import genai
+from dotenv import load_dotenv
+import time
+import os
+import logging
 
 
 logger = logging.getLogger(__name__)
@@ -40,23 +41,16 @@ class GeminiService(LLMService):
             )
 
         if max_retries < 0:
-            raise ValueError(
-                "max_retries cannot be negative."
-            )
+            raise ValueError("max_retries cannot be negative.")
 
         if retry_delay < 0:
-            raise ValueError(
-                "retry_delay cannot be negative."
-            )
+            raise ValueError("retry_delay cannot be negative.")
 
         self.client = genai.Client(api_key=api_key)
 
         self.model_name = (
             model_name
-            or os.getenv(
-                "GEMINI_MODEL",
-                "gemini-2.5-flash",
-            )
+            or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         )
 
         self.max_retries = max_retries
@@ -106,10 +100,14 @@ class GeminiService(LLMService):
                     or "No provider message supplied."
                 )
 
-                # Keep logs bounded and redact the API key defensively.
-                provider_message = provider_message.replace(
-                    api_key, "[REDACTED]"
-                )[:500]
+                # Redact the configured key before logging diagnostics.
+                api_key = os.getenv("GEMINI_API_KEY", "")
+                if api_key:
+                    provider_message = provider_message.replace(
+                        api_key, "[REDACTED]"
+                    )
+
+                provider_message = provider_message[:500]
 
                 logger.warning(
                     "Gemini server error: model=%s status=%s "
@@ -130,5 +128,3 @@ class GeminiService(LLMService):
                 delay = self.retry_delay * (2 ** attempt)
                 time.sleep(delay)
                 attempt += 1
-
-
