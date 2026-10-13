@@ -1,13 +1,13 @@
+import logging
+import os
+import time
+from dotenv import load_dotenv
+from google import genai
+from google.genai import errors
 from app.services.llm_service import (
     LLMService,
     LLMServiceUnavailableError,
 )
-from google.genai import errors
-from google import genai
-from dotenv import load_dotenv
-import time
-import os
-import logging
 
 
 logger = logging.getLogger(__name__)
@@ -101,13 +101,24 @@ class GeminiService(LLMService):
                 raise
 
             except errors.ServerError as exc:
+                provider_message = str(
+                    getattr(exc, "message", "")
+                    or "No provider message supplied."
+                )
+
+                # Keep logs bounded and redact the API key defensively.
+                provider_message = provider_message.replace(
+                    api_key, "[REDACTED]"
+                )[:500]
+
                 logger.warning(
                     "Gemini server error: model=%s status=%s "
-                    "attempt=%s max_retries=%s",
+                    "attempt=%s max_retries=%s provider_message=%s",
                     self.model_name,
                     exc.code,
                     attempt + 1,
                     self.max_retries + 1,
+                    provider_message,
                 )
 
                 if attempt >= self.max_retries:
