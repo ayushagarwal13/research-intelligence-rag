@@ -1,7 +1,9 @@
+
 from dotenv import load_dotenv
 from pathlib import Path
-import time
 import logging
+
+from app.services.worker_dependencies import create_ingestion_worker
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -20,9 +22,6 @@ POLL_INTERVAL_SECONDS = 5
 def create_worker_runner():
     logger.info("Initializing ingestion worker dependencies...")
 
-    from app.services.worker_dependencies import (
-        create_ingestion_worker,
-    )
     from app.services.worker_runner import WorkerRunner
 
     worker = create_ingestion_worker()

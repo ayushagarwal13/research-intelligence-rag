@@ -8,7 +8,7 @@ from app.embeddings.embedder import BGEEmbedder
 from app.reranking.reranker import CrossEncoderReranker
 from app.retrieval.keyword_search import KeywordSearch
 from app.retrieval.query_rewriter import QueryRewriter
-from app.services.gemini_service import GeminiService
+from app.services.groq_service import GroqService
 from app.services.generation_service import GenerationService
 from app.services.query_service import QueryService
 from app.services.rag_service import RAGService
@@ -55,14 +55,14 @@ class ApplicationContainer:
             keyword_chunks
         )
 
-        self.gemini_service = GeminiService()
+        self.groq_service = GroqService()
 
         self.query_rewriter = QueryRewriter(
-            llm_service=self.gemini_service
+            llm_service=self.groq_service
         )
 
         self.generation_service = GenerationService(
-            llm_service=self.gemini_service
+            llm_service=self.groq_service
         )
 
         self.rag_service = RAGService(
