@@ -1,5 +1,4 @@
-﻿
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
 const API_DEFAULT =
@@ -358,21 +357,28 @@ export default function App() {
   }
 
   async function uploadDocument(event) {
-    const file = event.target.files?.[0];
-
+    const files = Array.from(event.target.files ?? []);
     event.target.value = "";
 
-    if (!file) return;
+    if (files.length === 0) return;
 
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      setUploadError("Please select a PDF file.");
+    const invalidFiles = files.filter(
+      (file) => !file.name.toLowerCase().endsWith(".pdf")
+    );
+
+    if (invalidFiles.length > 0) {
+      setUploadError(
+        `Only PDF files are allowed. Invalid files: ${invalidFiles
+          .map((file) => file.name)
+          .join(", ")}`
+      );
       setUploadMessage("");
       return;
     }
 
     if (!liveMode) {
       setUploadError(
-        "Enable Live API mode in Settings before uploading a document."
+        "Enable Live API mode in Settings before uploading documents."
       );
       setUploadMessage("");
       return;
@@ -380,62 +386,97 @@ export default function App() {
 
     setUploadingDocument(true);
     setUploadError("");
-    setUploadMessage("Uploading PDF to the configured backend...");
+    setUploadMessage(`Uploading ${files.length} PDF(s)...`);
+
+    const successfulUploads = [];
+    const failedUploads = [];
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      for (const file of files) {
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
 
-      const response = await fetch(`${cleanedApiUrl}/documents/upload`, {
-        method: "POST",
-        headers: { Accept: "application/json" },
-        body: formData,
-      });
+          const response = await fetch(`${cleanedApiUrl}/documents/upload`, {
+            method: "POST",
+            headers: { Accept: "application/json" },
+            body: formData,
+          });
 
-      const data = await response.json().catch(() => ({}));
+          const data = await response.json().catch(() => ({}));
 
-      if (!response.ok) {
-        throw new Error(
-          extractErrorMessage(
-            data,
-            `Upload failed with HTTP ${response.status}.`
-          )
+          if (!response.ok) {
+            throw new Error(
+              extractErrorMessage(
+                data,
+                `Upload failed with HTTP ${response.status}.`
+              )
+            );
+          }
+
+          if (!data.document_id || !data.document_name) {
+            throw new Error(
+              "The upload endpoint returned an unexpected document response."
+            );
+          }
+
+          successfulUploads.push({
+            documentId: data.document_id,
+            documentName: data.document_name,
+            fileType: data.file_type ?? "PDF",
+            pageCount: data.page_count ?? null,
+            status: data.status ?? "registered",
+            uploadedAt: new Date(),
+          });
+        } catch (error) {
+          failedUploads.push({
+            fileName: file.name,
+            message: error.message || "Upload failed.",
+          });
+        }
+      }
+
+      if (successfulUploads.length > 0) {
+        setLibraryDocuments((current) => {
+          const updatedDocuments = [...current];
+
+          for (const uploadedDocument of successfulUploads) {
+            const existingIndex = updatedDocuments.findIndex(
+              (existing) =>
+                existing.documentId === uploadedDocument.documentId
+            );
+
+            if (existingIndex >= 0) {
+              updatedDocuments.splice(existingIndex, 1);
+            }
+
+            updatedDocuments.unshift(uploadedDocument);
+          }
+
+          return updatedDocuments;
+        });
+
+        setApiStatusMessage(
+          "Document upload endpoint responded successfully."
         );
       }
 
-      if (!data.document_id || !data.document_name) {
-        throw new Error(
-          "The upload endpoint returned an unexpected document response."
+      if (failedUploads.length === 0) {
+        setUploadMessage(
+          `Successfully registered all ${successfulUploads.length} PDF(s).`
+        );
+        setUploadError("");
+      } else {
+        setUploadMessage(
+          `Successfully registered ${successfulUploads.length} of ${files.length} PDF(s).`
+        );
+
+        setUploadError(
+          failedUploads
+            .map((failure) => `${failure.fileName}: ${failure.message}`)
+            .join("\n")
         );
       }
-
-      const registeredDocument = {
-        documentId: data.document_id,
-        documentName: data.document_name,
-        fileType: data.file_type ?? "PDF",
-        pageCount: data.page_count ?? null,
-        status: data.status ?? "registered",
-        uploadedAt: new Date(),
-      };
-
-      setLibraryDocuments((current) => [
-        registeredDocument,
-        ...current.filter(
-          (document) =>
-            document.documentId !== registeredDocument.documentId
-        ),
-      ]);
-
-      setUploadMessage(
-        `Successfully registered ${registeredDocument.documentName}. Processing status: ${registeredDocument.status}.`
-      );
-      setApiStatusMessage("Document upload endpoint responded successfully.");
-    } catch (error) {
-      setUploadError(
-        error.message ||
-          "Could not upload the document. Check the API URL, CORS configuration, and backend logs."
-      );
-      setUploadMessage("");
     } finally {
       setUploadingDocument(false);
     }
@@ -553,7 +594,9 @@ export default function App() {
                   : "API not checked"}
               </span>
             </div>
+
             <p className="status-description">{apiStatusMessage}</p>
+
             <button
               type="button"
               className="button button-small"
@@ -587,6 +630,7 @@ export default function App() {
                 <span>⚙</span>
                 <span>Settings</span>
               </button>
+
               <button
                 type="button"
                 className="button button-primary"
@@ -613,6 +657,7 @@ export default function App() {
                       documents and generate grounded answers.
                     </p>
                   </div>
+
                   <button
                     type="button"
                     className="button button-primary"
@@ -736,7 +781,6 @@ export default function App() {
                 </section>
               </>
             )}
-
             {page === "research" && (
               <>
                 <section className="page-heading">
@@ -1061,9 +1105,10 @@ export default function App() {
                       ref={documentFileInputRef}
                       type="file"
                       accept="application/pdf,.pdf"
+                      multiple
                       onChange={uploadDocument}
                       style={{ display: "none" }}
-                      aria-label="Choose a PDF document"
+                      aria-label="Choose multiple PDF documents"
                     />
 
                     <div className="callout">
@@ -1088,8 +1133,8 @@ export default function App() {
                       disabled={uploadingDocument}
                     >
                       {uploadingDocument
-                        ? "Uploading PDF..."
-                        : "Choose PDF and upload"}
+                        ? "Uploading PDFs..."
+                        : "Choose PDFs and upload"}
                     </button>
 
                     {!liveMode && (
@@ -1185,7 +1230,6 @@ export default function App() {
                 </section>
               </>
             )}
-
             {page === "ingestion" && (
               <>
                 <section className="page-heading">
@@ -1239,7 +1283,9 @@ export default function App() {
                       <div className="callout">
                         <span className="callout-icon">ⓘ</span>
                         <div>
-                          <p className="callout-title">Asynchronous ingestion</p>
+                          <p className="callout-title">
+                            Asynchronous ingestion
+                          </p>
                           <p className="callout-text">
                             The separate ingestion worker may process uploaded
                             documents asynchronously. This page does not
@@ -1345,6 +1391,7 @@ export default function App() {
                             ? "Checking connection..."
                             : "Test API connection"}
                         </button>
+
                         <button
                           type="button"
                           className="button"
