@@ -1,5 +1,7 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const API_DEFAULT =
   "https://research-intelligence-rag-production.up.railway.app";
@@ -136,6 +138,7 @@ function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+
 function renderCitedText(text, sources, onSelect) {
   const citationPattern = /\[(\d+)\]/g;
   const pieces = [];
@@ -146,9 +149,15 @@ function renderCitedText(text, sources, onSelect) {
   while ((match = citationPattern.exec(text)) !== null) {
     if (match.index > lastIndex) {
       pieces.push(
-        <span key={`text-${key++}`}>
+        <ReactMarkdown
+          key={`markdown-${key++}`}
+          remarkPlugins={[remarkGfm]}
+          components={{
+            p: ({ children }) => <p>{children}</p>,
+          }}
+        >
           {text.slice(lastIndex, match.index)}
-        </span>
+        </ReactMarkdown>
       );
     }
 
@@ -178,12 +187,18 @@ function renderCitedText(text, sources, onSelect) {
 
   if (lastIndex < text.length) {
     pieces.push(
-      <span key={`text-${key++}`}>{text.slice(lastIndex)}</span>
+      <ReactMarkdown
+        key={`markdown-${key++}`}
+        remarkPlugins={[remarkGfm]}
+      >
+        {text.slice(lastIndex)}
+      </ReactMarkdown>
     );
   }
 
   return pieces;
 }
+
 
 export default function App() {
   const [page, setPage] = useState("overview");
