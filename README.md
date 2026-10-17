@@ -10,7 +10,7 @@ Users can upload research papers and ask questions about their content. The syst
 
 ## Features
 
-- **PDF ingestion:** Extract text from research papers using PyMuPDF, with Tesseract OCR as a fallback for scanned documents.
+- **PDF ingestion:** Extract selectable text from text-based research PDFs using PyMuPDF. Scanned/image-only PDFs are not supported by the current extraction pipeline.
 - **Text chunking:** Split extracted text into smaller passages suitable for retrieval.
 - **Semantic search:** Generate dense embeddings using BGE.
 - **Hybrid retrieval:** Combine dense vector retrieval with BM25 keyword search.
@@ -26,7 +26,6 @@ Users can upload research papers and ask questions about their content. The syst
 | Frontend | React, Vite |
 | Backend API | FastAPI, Python |
 | PDF text extraction | PyMuPDF |
-| OCR fallback | Tesseract |
 | Embeddings | BGE |
 | Vector database | Qdrant Cloud |
 | Keyword retrieval | BM25 |
@@ -44,7 +43,7 @@ Users can upload research papers and ask questions about their content. The syst
 The application is organized into a frontend, backend API, and separate ingestion worker.
 
 1. **Document upload:** The frontend sends PDF files to the FastAPI backend.
-2. **Text extraction:** The document-processing pipeline extracts text and uses OCR when required.
+2. **Text extraction:** PyMuPDF extracts selectable text from text-based PDFs. OCR is not implemented in this project, so scanned/image-only PDFs may not yield usable text.
 3. **Chunking and embeddings:** Extracted text is divided into chunks and represented as vectors.
 4. **Indexing:** Document vectors are stored in Qdrant for retrieval.
 5. **Hybrid retrieval:** Dense search and BM25 retrieve candidate passages, which are combined using rank fusion and reranked.
@@ -69,7 +68,6 @@ The backend health endpoint verifies API availability; it does not guarantee tha
 - PostgreSQL connection details
 - Qdrant Cloud URL and API key
 - An API key for the LLM provider configured in the backend
-- Tesseract OCR installed if OCR fallback is required
 
 ### Backend setup
 
@@ -126,7 +124,7 @@ Configure the frontend API base URL to point to the backend you intend to use.
 ## Current Limitations
 
 - Retrieval quality depends on successful document ingestion, indexing, and passage selection.
-- OCR quality depends on the source PDF and scan quality.
+- The current ingestion pipeline is designed for text-based PDFs; scanned/image-only PDFs are not supported because OCR is not implemented.
 - Generated answers and citations must be checked against the original papers.
 - A document marked `registered` may not yet be fully indexed.
 - Free-tier hosting, database retention, and API quotas may affect long-term availability.
